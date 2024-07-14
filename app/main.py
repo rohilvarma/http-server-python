@@ -64,6 +64,7 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
         file_name = endpoint[7:]
         curr_dir = os.getcwd()
         file_path = os.path.join(os.path.join(curr_dir, dir_name), file_name)
+        print(file_path)
         if os.path.isfile(file_path):
             file_content = ""
             with open(file_path, "r") as file:

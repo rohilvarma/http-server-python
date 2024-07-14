@@ -63,19 +63,18 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
     elif endpoint.startswith("/files") and dir_name is not None:
         file_name = endpoint[7:]
         curr_dir = os.getcwd()
-        file_path = os.path.join(os.path.join(curr_dir, dir_name), file_name)
-        if os.path.isfile(file_path):
-            file_content = ""
-            with open(file_path, "r") as file:
-                file_content = file.read()
-            file.close()
-            return create_response(
-                http_code=200,
-                headers={
-                    "Content-Type": "application/octet-stream",
-                    "Content-Length": str(len(file_content))
-                },
-                data=file_content
+        file_path = os.path.join(os.path.join(curr_dir, dir_name[1:]), file_name)
+        file_content = ""
+        with open(file_path, "r") as file:
+            file_content = file.read()
+        file.close()
+        return create_response(
+            http_code=200,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "Content-Length": str(len(file_content))
+            },
+            data=file_content
             )
         
     return create_response(404)
@@ -116,7 +115,7 @@ def handle_clients(client_socket: socket.socket, dir_name: str | None) -> None:
         
         headers = create_headers(request_list[1:])
         
-        client_socket.send(get_http_response(endpoint, headers, dir_name))
+        client_socket.send(get_http_response(endpoint, headers, dir_name[1:] if dir_name is not None else dir_name))
         
     except Exception as e:
         print("Exception occured", e)
@@ -125,28 +124,10 @@ def handle_clients(client_socket: socket.socket, dir_name: str | None) -> None:
         client_socket.close()
         print("Connection is closed!\n")
 
-def create_directory(dir_name: str) -> None:
-    """
-    Checks if the directory passed in the request exists on the server, if not creates one with that name.
-    
-    :param dir_name: Name of the directory passed.
-    :returns: Void function, doesn't returns anything.
-    :rtype: None
-    """
-    curr_dir = os.getcwd()
-    dir_path = os.path.join(curr_dir, dir_name)
-
-    if not os.path.isdir(dir_path):
-        os.mkdir(dir_name)
-
 def main(directory: str | None) -> None:
     print("Logs from your program will appear here!")
     
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True, backlog=3)
-    
-    if directory is not None:
-        directory = directory[1:] if directory.startswith("/") else directory
-        create_directory(directory)
     
     while True:
         client_socket, client_addr = server_socket.accept()

@@ -14,7 +14,29 @@ def get_accessed_endpoint(request_line: str) -> str:
     """
     return request_line.split(" ")[1]
 
-def create_response(http_code: int, headers: dict[str, str]={}, data: str="") -> bytes:
+def get_http_status_message(http_code: int) -> str:
+    """
+    Get the status message for an HTTP Code.
+    
+    :param http_code: HTTP response code.
+    :returns: HTTP response code mesage.
+    :rtype: str
+    """
+    match http_code:
+        case 200:
+            return "OK"
+        case 201:
+            return "Created"
+        case 404:
+            return "Not Found"
+        case _:
+            return "HTTP Code not found"
+
+def create_http_response(
+    http_code: int, 
+    headers: dict[str, str]={}, 
+    data: str=""
+) -> bytes:
     """
     Create the HTTP response.
 
@@ -24,13 +46,17 @@ def create_response(http_code: int, headers: dict[str, str]={}, data: str="") ->
     :returns: An HTTP Response.
     :rtype: bytes
     """
-    status_line = "HTTP/1.1 {} {}".format(http_code, "OK" if http_code == 200 else "Not Found").encode()
+    status_line = "HTTP/1.1 {} {}".format(http_code, get_http_status_message(http_code)).encode()
     response_headers = ["{}: {}".format(key, value).encode() + b"\r\n" for key, value in headers.items()]
     response_headers = b"".join(response_headers)
     response_body = data.encode()
     return b"\r\n".join([status_line, response_headers, response_body])
 
-def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | None = None) -> bytes:
+def http_response_get(
+    endpoint: str, 
+    headers: dict[str, str], 
+    dir_name: str | None = None,
+) -> bytes:
     """
     Determines the HTTP response based on the endpoint accessed.
 
@@ -40,9 +66,9 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
     :rtype: bytes
     """
     if endpoint == "/" or endpoint == "/index.html":
-        return create_response(200)
+        return create_http_response(200)
     elif endpoint.startswith("/echo"):
-        return create_response(
+        return create_http_response(
             http_code=200,
             headers={
                 "Content-Type": "text/plain",
@@ -52,7 +78,7 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
         )
     elif endpoint == "/user-agent":
         user_agent_value = headers["User-Agent"]
-        return create_response(
+        return create_http_response(
             http_code=200,
             headers={
                 "Content-Type": "text/plain",
@@ -62,15 +88,13 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
         )
     elif endpoint.startswith("/files") and dir_name is not None:
         file_name = endpoint[7:]
-        curr_dir = os.getcwd()
         file_path = os.path.join(dir_name, file_name)
-        print(file_path)
         if os.path.isfile(file_path):
             file_content = ""
             with open(file_path, "r") as file:
                 file_content = file.read()
             file.close()
-            return create_response(
+            return create_http_response(
                 http_code=200,
                 headers={
                     "Content-Type": "application/octet-stream",
@@ -79,7 +103,24 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
                 data=file_content
             )
 
-    return create_response(404)
+    return create_http_response(404)
+
+def http_response_post(
+    endpoint: str, 
+    dir_name: str | None,
+    body_data: str
+) -> bytes:
+    if endpoint.startswith("/files") and dir_name is not None:
+        file_name = endpoint[7:]
+        file_path = os.path.join(dir_name, file_name)
+        
+        with open(file_path, "w") as fout:
+            fout.write(body_data)
+        fout.close()
+
+        return create_http_response(http_code=201)
+        
+    return create_http_response(404)
 
 def create_headers(request_list: list[str]) -> dict[str, str]:
     """
@@ -112,12 +153,21 @@ def handle_clients(client_socket: socket.socket, dir_name: str | None) -> None:
     try:
         request = client_socket.recv(1024).decode()
         request_list = request.split("\r\n")
-
+        
+        http_request_method = request_list[0].split(" ")[0]
         endpoint = get_accessed_endpoint(request_list[0])
 
         headers = create_headers(request_list[1:])
-
-        client_socket.send(get_http_response(endpoint, headers, dir_name))
+        match http_request_method:
+            case "GET":
+                client_socket.send(http_response_get(endpoint, headers, dir_name))
+            
+            case "POST":
+                client_socket.send(http_response_post(endpoint, dir_name, request_list[-1]))
+            
+            case _:
+                raise ValueError("Unexpected HTTP Request method passed.")
+        
 
     except Exception as e:
         print("Exception occured", e)

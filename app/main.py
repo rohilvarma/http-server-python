@@ -64,18 +64,19 @@ def get_http_response(endpoint: str, headers: dict[str, str], dir_name: str | No
         file_name = endpoint[7:]
         curr_dir = os.getcwd()
         file_path = os.path.join(os.path.join(curr_dir, dir_name), file_name)
-        file_content = ""
-        with open(file_path, "r") as file:
-            file_content = file.read()
-        file.close()
-        return create_response(
-            http_code=200,
-            headers={
-                "Content-Type": "application/octet-stream",
-                "Content-Length": str(len(file_content))
-            },
-            data=file_content
-        )
+        if os.path.isfile(file_path):
+            file_content = ""
+            with open(file_path, "r") as file:
+                file_content = file.read()
+            file.close()
+            return create_response(
+                http_code=200,
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(len(file_content))
+                },
+                data=file_content
+            )
 
     return create_response(404)
 

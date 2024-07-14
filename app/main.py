@@ -117,7 +117,7 @@ def handle_clients(client_socket: socket.socket, dir_name: str | None) -> None:
 
         headers = create_headers(request_list[1:])
 
-        client_socket.send(get_http_response(endpoint, headers, dir_name[1:] if dir_name is not None else dir_name))
+        client_socket.send(get_http_response(endpoint, headers, dir_name))
 
     except Exception as e:
         print("Exception occured", e)

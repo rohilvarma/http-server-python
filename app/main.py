@@ -60,8 +60,9 @@ def is_valid_compressions(compression_scheme: str) -> bool:
     :returns: Response if a compression scheme exists.
     :rtype: bool
     """
-    _valid_schemes = ["gzip"]
-    return compression_scheme in _valid_schemes
+    _valid_schemes_set = {"gzip"}
+    compression_scheme_set = set(compression_scheme.split(", "))
+    return len(compression_scheme_set.intersection(_valid_schemes_set)) > 0
 
 def http_response_get(
     endpoint: str, 

@@ -52,22 +52,45 @@ def create_http_response(
     response_body = data.encode()
     return b"\r\n".join([status_line, response_headers, response_body])
 
+def is_valid_compressions(compression_scheme: str) -> bool:
+    """
+    Determine if a compression scheme is supported by the HTTP Server.
+    
+    :param compresson_scheme: Compression scheme sent in the request.
+    :returns: Response if a compression scheme exists.
+    :rtype: bool
+    """
+    _valid_schemes = ["gzip"]
+    return compression_scheme in _valid_schemes
+
 def http_response_get(
     endpoint: str, 
     headers: dict[str, str], 
     dir_name: str | None = None,
+    body_data: str = ""
 ) -> bytes:
     """
-    Determines the HTTP response based on the endpoint accessed.
+    Determines the GET HTTP response based on the endpoint accessed.
 
     :param endpoint: The endpoint requested by HTTP.
     :param headers: Headers dictionary containing all headers from the request.
+    :param dir_name: Directory name where request file should exist.
+    :param body_data: Request data in the body.
     :returns: Byte response for the HTTP request.
     :rtype: bytes
     """
     if endpoint == "/" or endpoint == "/index.html":
         return create_http_response(200)
     elif endpoint.startswith("/echo"):
+        if is_valid_compressions(headers.get("Accept-Encoding", "")):
+            return create_http_response(
+                http_code=200,
+                headers={
+                    "Content-Encoding": "gzip",
+                    "Content-Type": "text/plain",
+                },
+            )
+        
         return create_http_response(
             http_code=200,
             headers={
@@ -110,6 +133,15 @@ def http_response_post(
     dir_name: str | None,
     body_data: str
 ) -> bytes:
+    """
+    Determines the POST HTTP response based on the endpoint accessed.
+
+    :param endpoint: The endpoint requested by HTTP.
+    :param dir_name: Directory where the file is to be created.
+    :param body_data: Data/content to be written on the new file.
+    :returns: Byte response for the HTTP request.
+    :rtype: bytes
+    """
     if endpoint.startswith("/files") and dir_name is not None:
         file_name = endpoint[7:]
         file_path = os.path.join(dir_name, file_name)
@@ -130,7 +162,9 @@ def create_headers(request_list: list[str]) -> dict[str, str]:
     :returns: A headers dictionary.
     :rtype: dict[str, str]
     """
-    header_keys = ["Host", "User-Agent", "Accept"]
+    header_keys = [
+        "Host", "User-Agent", "Accept", "Content-Type", "Content-Length", "Accept-Encoding", "Content-Encoding"
+    ]
 
     headers = {}
     for header in request_list:

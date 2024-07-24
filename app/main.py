@@ -2,6 +2,7 @@ import os
 import socket
 import threading
 from argparse import ArgumentParser
+from gzip import compress
 
 
 def get_accessed_endpoint(request_line: str) -> str:
@@ -35,7 +36,7 @@ def get_http_status_message(http_code: int) -> str:
 def create_http_response(
     http_code: int, 
     headers: dict[str, str]={}, 
-    data: str=""
+    data: str | bytes=""
 ) -> bytes:
     """
     Create the HTTP response.
@@ -49,7 +50,7 @@ def create_http_response(
     status_line = "HTTP/1.1 {} {}".format(http_code, get_http_status_message(http_code)).encode()
     response_headers = ["{}: {}".format(key, value).encode() + b"\r\n" for key, value in headers.items()]
     response_headers = b"".join(response_headers)
-    response_body = data.encode()
+    response_body = data.encode() if isinstance(data, str) else data
     return b"\r\n".join([status_line, response_headers, response_body])
 
 def is_valid_compressions(compression_scheme: str) -> bool:
@@ -84,12 +85,16 @@ def http_response_get(
         return create_http_response(200)
     elif endpoint.startswith("/echo"):
         if is_valid_compressions(headers.get("Accept-Encoding", "")):
+            raw_content = endpoint[6:]
+            gzipped_content = compress(bytes(raw_content, "utf-8"))
             return create_http_response(
                 http_code=200,
                 headers={
                     "Content-Encoding": "gzip",
                     "Content-Type": "text/plain",
+                    "Content-Length": str(len(gzipped_content)),
                 },
+                data=gzipped_content
             )
         
         return create_http_response(
